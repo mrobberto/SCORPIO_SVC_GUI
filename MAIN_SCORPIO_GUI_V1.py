@@ -108,13 +108,7 @@ class MainPage(tk.Tk):
                                            command=self.open_file)
         button_FITS_Load.place(x=0,y=0)
         
-        self.selected_slit = tk.StringVar()
-        self.slit_widths_dropdown = ttk.Combobox(self.frame_FITSmanager, width = 10, 
-                                            textvariable=self.selected_slit,
-                                            values=SCORP_SlitWidths)
         
-        self.slit_widths_dropdown.place(x=195, y=180)
-        self.slit_widths_dropdown.bind("<<ComboboxSelected>>", self.draw_slit_reg)
         
         
 # =============================================================================
@@ -142,7 +136,11 @@ class MainPage(tk.Tk):
              "PanSTARRS/DR1/z",
              "2MASS/J",
              "GALEX",
-             "AllWISE/W3"]
+             "AllWISE/W3",
+             "CDS/P/skymapper-I",
+             "CDS/P/skymapper-G",
+             "CDS/P/skymapper-R",
+             "CDS/P/skymapper-Z"]
 #        # datatype of menu text
         self.Survey_selected = tk.StringVar()
 #        # initial menu text
@@ -197,9 +195,19 @@ class MainPage(tk.Tk):
                                            command=self.SkyMapper_query)
         button_skymapper_query.place(x=190,y=80)
                
+        
+        """ Twirl Astrometry """
         button_twirl_Astrometry =  tk.Button(labelframe_FITSmanager, text="twirl_Astrometry", bd=3, 
                                             command=self.twirl_Astrometry)
         button_twirl_Astrometry.place(x=190,y=105)
+        
+        # threshold for source detection in twirl
+        label_detect_thresh =  tk.Label(labelframe_FITSmanager, text="Detection Threshhold")
+        label_detect_thresh.place(x=190,y=140)
+        self.detect_thresh=tk.StringVar()
+        entry_detect_thresh = tk.Entry(labelframe_FITSmanager, width=3,  bd =3, textvariable=self.detect_thresh)
+        entry_detect_thresh.place(x=330, y=138)
+        self.detect_thresh.set('2')
         
 # #===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#=====
 #
@@ -212,6 +220,16 @@ class MainPage(tk.Tk):
         self.dither_frame = tk.LabelFrame(self,text="Calculate Offset",
                                           font=("Ariel, 25"),width=380, height=210)
         self.dither_frame.place(x=4, y=300)
+        
+        label_slit_select =  tk.Label(self.dither_frame, text="Slit Select")
+        label_slit_select.place(x=220,y=-5)
+        self.selected_slit = tk.StringVar()
+        self.slit_widths_dropdown = ttk.Combobox(self.dither_frame, width = 10, 
+                                            textvariable=self.selected_slit,
+                                            values=SCORP_SlitWidths)
+        
+        self.slit_widths_dropdown.place(x=200, y=15)
+        self.slit_widths_dropdown.bind("<<ComboboxSelected>>", self.draw_slit_reg)
         
         self.curr_des_var = tk.StringVar()
         self.curr_des_var.set("current")
@@ -467,10 +485,12 @@ class MainPage(tk.Tk):
     # =============================================================================
         from urllib.parse import urlencode
         from astropy.io import fits
-        object_main_id = query_results[0]['MAIN_ID']#.decode('ascii')
+        from astroquery.hips2fits import hips2fits
+        #object_main_id = query_results[0]['MAIN_ID']#.decode('ascii')
         object_coords = SkyCoord(ra=query_results['RA'], dec=query_results['DEC'], 
-                                 unit=(u.deg, u.deg), frame='icrs')
+                                 unit=(u.hourangle, u.deg), frame='icrs')
         c = SkyCoord(self.string_RA.get(),self.string_DEC.get(), unit=(u.deg, u.deg))
+        """
         fov = 180#SCORP_Scale*CCD_size_y/60.
         query_params = { 
              'hips': self.Survey_selected.get(), #'DSS', #
@@ -478,18 +498,41 @@ class MainPage(tk.Tk):
              # Download an image centered on the first object in the results 
              #'ra': object_coords[0].ra.value, 
              #'dec': object_coords[0].dec.value, 
-             'projection':'TAN',
+             #'projection':'TAN',
              'ra': c.ra.value, 
              'dec': c.dec.value,
-             'fov': (fov * u.arcmin).to(u.deg).value, 
-             'width': CCD_size_x,#528, 
-             'height': CCD_size_y#516 
+             'fov': (fov * u.arcsec).to(u.deg).value, 
+             'width': int(CCD_size_x/2), #528, 
+             'height': int(CCD_size_y/2) #516 
              }                                                                                       
              #&&&
         url = f'http://alasky.u-strasbg.fr/hips-image-services/hips2fits?{urlencode(query_params)}' 
         hdul = fits.open(url)                                                                           
         # Downloading http://alasky.u-strasbg.fr/hips-image-services/hips2fits?hips=DSS&object=%5BT64%5D++7&ra=243.58457533549102&dec=-19.113364937196987&fov=0.03333333333333333&width=500&height=500
         #|==============================================================| 504k/504k (100.00%)         0s
+        """
+        scale_factor = 2
+        #scale = 180/CCD_size_y
+        query_params = {"NAXIS1": int(CCD_size_x/scale_factor),
+                        "NAXIS2": int(CCD_size_y/scale_factor),
+                        "WCSAXES": 2,
+                        "CRPIX1": int(CCD_size_x/(scale_factor*2)),
+                        "CRPIX2": int(CCD_size_y/(scale_factor*2)),
+                        "CDELT1": SCORP_Scale/3600 * scale_factor  ,
+                        "CDELT2": SCORP_Scale/3600 * scale_factor,
+                        "CUNIT1": "deg",
+                        "CUNIT2": "deg",
+                        "CTYPE1": "RA---TAN",
+                        "CTYPE2": "DEC--TAN",
+                        "CRVAL1": c.ra.value,
+                        "CRVAL2": c.dec.value}
+        
+        query_wcs = wcs.WCS(query_params)
+        hips = self.Survey_selected.get()
+        hdul = hips2fits.query_with_wcs(hips = hips,
+                                        wcs=query_wcs,
+                                        get_query_payload=False,
+                                        format='fits', min_cut=0.5, max_cut=99.5)
         hdul.info()
                                                                                             
         #Filename: /path/to/.astropy/cache/download/py3/ef660443b43c65e573ab96af03510e19
@@ -521,7 +564,8 @@ class MainPage(tk.Tk):
         self.image = hdul                                    
         hdul.writeto('./newtable.fits',overwrite=True)
         
-    
+        self.wcs = wcs.WCS(hdul[0].header)
+        
         from ginga.AstroImage import AstroImage
         from PIL import Image
         img = AstroImage()
@@ -529,8 +573,10 @@ class MainPage(tk.Tk):
         Posx = self.string_RA.get()
         Posy = self.string_DEC.get()
         filt= self.string_Filter.get()
-        data = hdul[0].data
+        data = hdul[0].data#[:,::-1]
+        # PIL Image indexing is like FITS (x, y)
         image_data = Image.fromarray(data)
+        img_res = image_data
         img_res = image_data.resize(size=(CCD_size_x,CCD_size_y))
         self.hdu_res = fits.PrimaryHDU(img_res)
             # ra, dec in degrees
@@ -599,9 +645,9 @@ class MainPage(tk.Tk):
         
         # self.root.title(filepath)
     
-    
+    """
     def twirl_Astrometry(self):
-        """ to be written """
+        """"""# to be written """""""
         from astropy.io import fits
         import numpy as np
         from astropy import units as u
@@ -649,12 +695,14 @@ class MainPage(tk.Tk):
         regs = Regions(regions)
         for reg in regs:
             obj = r2g(reg)
+            obj.color = "red"
         # add_region(self.canvas, obj, tag="twirlstars", draw=True)
-            #self.canvas.add(obj)
+            self.canvas.add(obj)
         
         # we can now compute the WCS
         gaias = twirl.gaia_radecs(center, fov, limit=self.nrofstars.get())
         self.wcs = twirl._compute_wcs(stars, gaias)
+        self.wcs = twirl.compute_wcs(center=center, stars=stars, fov=fov)
         
         
         # Lets check the WCS solution 
@@ -667,7 +715,7 @@ class MainPage(tk.Tk):
         regs_gaia = Regions(regions_gaia)
         for reg in regs_gaia:
             obj = r2g(reg)
-            obj.color="red"
+            obj.color="green"
         # add_region(self.canvas, obj, tag="twirlstars", redraw=True)
             self.canvas.add(obj)
         
@@ -692,12 +740,144 @@ class MainPage(tk.Tk):
         # import astropy.wcs as apwcs
         # wcs = apwcs.WCS(hdu[('sci',1)].header)
         # hdu.close()
+    """
+    def twirl_Astrometry(self):
         
+        from astropy.io import fits
+        import numpy as np
+        from astropy import units as u
+        from astropy.coordinates import SkyCoord
+        from matplotlib import pyplot as plt
+        import twirl
+        
+        try:
+            image = self.fits_image_ff
+            self.Display(self.fits_image_ff)
+        except AttributeError:
+            image = self.fullpath_FITSfilename
+            self.Display(self.fullpath_FITSfilename)
+        # self.load_file()   #for ging
+        
+        hdu=fits.open(image)[0]  #for this function to work
+        
+        header = hdu.header 
+        data = hdu.data
+        
+        ra, dec = header["RA"], header["DEC"]
+        center = SkyCoord(ra, dec, unit=["deg", "deg"])
+        center = [center.ra.value, center.dec.value]
+        
+        # image shape and pixel size in "
+        shape = data.shape
+        
+        pixel = SCORP_Scale * u.arcsec
+        fov = np.max(shape)*pixel.to(u.deg).value
+        
+        # Let's find some stars and display the image
+        
+        self.canvas.delete_all_objects(redraw=True)
+        
+        # need to change threshold for star detection 
+        #otherwise the twirl solver doesn't have enought to get a solution.
+        thresh = float(self.detect_thresh.get())
+        stars = twirl.find_peaks(data, threshold=thresh)[0:self.nrofstars.get()]
+        
+#        plt.figure(figsize=(8,8))
+        med = np.median(data)
+#        plt.imshow(data, cmap="Greys_r", vmax=np.std(data)*5 + med, vmin=med)
+#        plt.plot(*stars.T, "o", fillstyle="none", c="w", ms=12)
+
+        from regions import PixCoord, CirclePixelRegion
+#        xs=stars[0,0]
+#        ys=stars[0,1]
+#        center_pix = PixCoord(x=xs, y=ys)
+        radius_pix = 42
+#        region = CirclePixelRegion(center_pix, radius_pix)
+        
+        regions = [CirclePixelRegion(center=PixCoord(x, y), radius=radius_pix)
+                for x, y in stars]  #[(1, 2), (3, 4)]]
+        regs = Regions(regions)
+        for reg in regs:
+            obj = r2g(reg)
+        # add_region(self.canvas, obj, tag="twirlstars", draw=True)
+            self.canvas.add(obj)
+        #done with finding the brightest stars in the field.
+        # we can now look at the GAIA stars to compute the WCS
+        gaias = twirl.gaia_radecs(center, fov, limit=self.nrofstars.get())
+        
+        self.wcs = twirl._compute_wcs(stars, gaias)
+        
+        
+        # Lets check the WCS solution 
+        
+#        plt.figure(figsize=(8,8))
+        radius_pix = 25
+        gaia_pixel = np.array(SkyCoord(gaias, unit="deg").to_pixel(self.wcs)).T
+        regions_gaia = [CirclePixelRegion(center=PixCoord(x, y), radius=radius_pix)
+                for x, y in gaia_pixel]  #[(1, 2), (3, 4)]]
+        regs_gaia = Regions(regions_gaia)
+        for reg in regs_gaia:
+            obj = r2g(reg)
+            obj.color="red"
+        # add_region(self.canvas, obj, tag="twirlstars", redraw=True)
+            self.canvas.add(obj)
+        
+        print(self.wcs)
+        hdu_wcs = self.wcs.to_fits()
+        
+        #if self.loaded_regfile is not None:
+        #    hdu_wcs[0].header.set("dmdmap", os.path.split(self.loaded_regfile)[1])
+            
+        hdu_wcs[0].data = data # add data to fits file
+        self.wcs_filename = "./fits_image/" + "WCS_"+ra+"_"+dec+".fits"
+        hdu_wcs[0].writeto(self.wcs_filename,overwrite=True)
+        
+        self.Display(self.wcs_filename)
+        
+        self.btn_curr.config(state = tk.ACTIVE)
+        self.btn_des.config(state = tk.ACTIVE)
+        #
+        # > to read:
+        # hdu = fits_open(self.wcs_filename)
+        # hdr = hdu[0].header
+        # import astropy.wcs as apwcs
+        # wcs = apwcs.WCS(hdu[('sci',1)].header)
+        # hdu.close()
+        
+ 
+        
+        
+
+        
+# #===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#=====
+#     def start_the_loop(self):
+#         while self.stop_it == 0:
+#             threading.Timer(1.0, self.load_manager_last_file).start() 
+# 
+#     def load_manager_last_file(self):
+#         FITSfiledir = './fits_image/'
+#         self.fullpath_FITSfilename = FITSfiledir + (os.listdir(FITSfiledir))[0]
+#         print(self.fullpath_FITSfilename)        
+# 
+#     def stop_the_loop(self):
+#         self.stop_it == 1
+# 
+# #===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#=====
+
+        
+
+# #===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#=====
+#         image = load_data(self.fullpath_FITSfilename, logger=self.logger)
+#         self.fitsimage.set_image(image)
+#         self.root.title(self.fullpath_FITSfilename)
+# 
+# #===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#=====
+    
         
     def block_light(self):
         
         x_center_pix = CCD_size_x/2
-        scale_fov_x = 180/2220
+        scale_fov_x = SCORP_Scale #180/2220
         light_left_right_pix = 8/scale_fov_x # half of 16'' width of allowed light
         
        
@@ -737,7 +917,7 @@ class MainPage(tk.Tk):
         
         
         y_center_pix = CCD_size_y/2
-        scale_fov_y = 180/2750
+        scale_fov_y = SCORP_Scale #180/2750
         light_up_down_pix = 45/scale_fov_y # half of 90'' height of allowed light
         
         if y_center_pix>light_up_down_pix:
@@ -755,7 +935,7 @@ class MainPage(tk.Tk):
             blocked_light_down_obj.fillalpha = 0.5
             blocked_light_down_obj.color = "pink"
             blocked_light_down_obj.fillcolor = "pink"
-            self.canvas.add(blocked_light_down_obj)
+            #self.canvas.add(blocked_light_down_obj)
             
             
             
@@ -771,7 +951,7 @@ class MainPage(tk.Tk):
             blocked_light_up_obj.fillalpha = 0.5
             blocked_light_up_obj.color = "pink"
             blocked_light_up_obj.fillcolor = "pink"
-            self.canvas.add(blocked_light_up_obj)
+            #self.canvas.add(blocked_light_up_obj)
             
         
     def draw_slit_reg(self, event):
@@ -826,9 +1006,17 @@ class MainPage(tk.Tk):
         """ to be written """
         filename = filedialog.askopenfilename(filetypes=[("allfiles", "*"),
                                               ("fitsfiles", "*.fits")])
+        self.fullpath_FITSfilename = filename
         # self.load_file()
         self.AstroImage = load_data(filename, logger=self.logger)
         self.fitsimage.set_image(self.AstroImage)
+        hdu = fits.open(filename)
+        hdr = hdu[0].header
+        
+        ra = hdr["RA"]
+        dec = hdr["DEC"]
+        self.string_DEC.set(dec)
+        self.string_RA.set(ra)
         
         if self.AstroImage.wcs.wcs.has_celestial:
             self.wcs = self.AstroImage.wcs.wcs
@@ -867,7 +1055,7 @@ class MainPage(tk.Tk):
             img_data = self.AstroImage.get_data()
             
             r = RectanglePixelRegion(center=PixCoord(x=x_c, y=y_c),
-                                            width=90, height=90,
+                                            width=110, height=110,
                                             angle = 0*u.deg)
             
             robj = r2g(r)
