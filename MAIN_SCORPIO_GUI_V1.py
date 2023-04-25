@@ -595,7 +595,7 @@ class MainPage(tk.Tk):
         self.fits_image_ff = "{}/fits_image/newimage_ff.fits".format(work_dir)
         fits.writeto(self.fits_image_ff,self.hdu_res.data,header=self.hdu_res.header,overwrite=True) 
  
-        self.block_light()
+        #self.block_light()
         
         # self.root.title(filepath)
     
@@ -649,8 +649,9 @@ class MainPage(tk.Tk):
         regs = Regions(regions)
         for reg in regs:
             obj = r2g(reg)
+            obj.color = "red"
         # add_region(self.canvas, obj, tag="twirlstars", draw=True)
-            #self.canvas.add(obj)
+            self.canvas.add(obj)
         
         # we can now compute the WCS
         gaias = twirl.gaia_radecs(center, fov, limit=self.nrofstars.get())
@@ -667,7 +668,7 @@ class MainPage(tk.Tk):
         regs_gaia = Regions(regions_gaia)
         for reg in regs_gaia:
             obj = r2g(reg)
-            obj.color="red"
+            obj.color="green"
         # add_region(self.canvas, obj, tag="twirlstars", redraw=True)
             self.canvas.add(obj)
         
@@ -679,7 +680,7 @@ class MainPage(tk.Tk):
         
         self.Display(self.wcs_filename)
         
-        self.block_light()
+        #self.block_light()
         
         self.btn_curr.config(state = tk.ACTIVE)
         self.btn_des.config(state = tk.ACTIVE)
@@ -838,7 +839,7 @@ class MainPage(tk.Tk):
             self.btn_des.config(state = tk.ACTIVE)
             print("should be activated")
             
-        self.block_light()
+        #self.block_light()
             
     def draw_cb(self, canvas, tag):
         """ to be written """
@@ -1013,7 +1014,7 @@ class MainPage(tk.Tk):
         
                     
         self.canvas.delete_all_objects(redraw=True)
-        self.block_light()
+        #self.block_light()
         
     def quit(self,root):
         root.destroy()

@@ -11,24 +11,33 @@ import urllib.request
 
 CCD_size_y = 2750
 CCD_size_x = 2220
+fov_arcsec = 180 #90
 SCORP_Scale = 90/CCD_size_y # arcsec/pixel
+
 
 def skymapper_interrogate(POSx=150.041214, POSy=-54.893356, filter='r'):
     POS = str(POSx)+","+str(POSy)   #"189.99763,-11.62305"
-    Sizex = 180/3600#SCORP_Scale / 3600 *CCD_size_x
-    Sizey = 180/3600#SCORP_Scale / 3600 *CCD_size_y
+#    Sizex = 180/3600#SCORP_Scale / 3600 *CCD_size_x
+#    Sizey = 180/3600#SCORP_Scale / 3600 *CCD_size_y
+    Sizex = fov_arcsec*CCD_size_x/CCD_size_y/3600#SCORP_Scale / 3600 *CCD_size_x
+    Sizey = fov_arcsec/3600#SCORP_Scale / 3600 *CCD_size_y
     SIZE = str(Sizex) + "," + str(Sizey)  #"0.05,0.1"
     NAXIS = str(CCD_size_x) + "," + str(CCD_size_y)
     CDELT = str(SCORP_Scale/3600).replace("e","E")#"[-"+str(SCORP_Scale/3600)+","+str(SCORP_Scale/3600)+"]"
+    CDELT1 = str(fov_arcsec/CCD_size_x/3600).replace("e", "E")
+    CDELT2 = str(fov_arcsec/CCD_size_y/3600).replace("e", "E")
     FILTERS  = filter  #"g"#"g,r,i"
     string0= 'https://api.skymapper.nci.org.au/public/siap/dr2/'
     string = string0 + "query?"
     string += 'POS=' + POS + '&'
     string += 'SIZE=' + SIZE + '&'
     string += 'BAND=' + FILTERS + '&'
-    #string += 'NAXIS=' + NAXIS + '&'
+    string += 'NAXIS=' + NAXIS + '&'
     #string += 'CDELT=' + CDELT + '&'
-    string += 'FORMAT=image/fits&INTERSECT=covers&MJD_END=56970&RESPONSEFORMAT=CSV'
+    #string += 'CDELT=' + "-"+CDELT1+","+CDELT2 + '&'
+#    string += 'FORMAT=image/fits&INTERSECT=covers&MJD_END=56970&RESPONSEFORMAT=CSV'
+
+    string += 'FORMAT=image/fits&INTERSECT=covers&MJD_END=60000&RESPONSEFORMAT=CSV'
     print(string)
     with urllib.request.urlopen(string) as response:
        html = response.read()
@@ -47,7 +56,7 @@ def skymapper_interrogate(POSx=150.041214, POSy=-54.893356, filter='r'):
     string += 'SIZE=' + SIZE + '&'
     string += 'POS=' + POS + '&'
     string += 'BAND=' + FILTERS + '&'
-    #string += 'NAXIS=' + NAXIS + '&'
+    string += 'NAXIS=' + NAXIS + '&'
     #string += 'CDELT=' + CDELT + '&'
     string += 'FORMAT=fits'
     
