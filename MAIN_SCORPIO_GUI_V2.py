@@ -43,12 +43,23 @@ from tkinter import ttk
 from tkinter import filedialog
 import tkinter as tk
 
+
+from ginga.AstroImage import AstroImage
+from PIL import Image
+from astropy.io import fits
+from astroquery.hips2fits import hips2fits
+
+img = AstroImage()
 iq = iqcalc.IQCalc()
 
 cwd = os.getcwd()
 print(cwd)
 
 SCORP_SlitWidths = [4.32, 2.16, 1.44, 1.08, 0.72, 0.54, 0.36] #arcseconds
+SCORP_SlitColors = ['#377eb8', '#ff7f00', '#4daf4a',
+                  '#f781bf', '#a65628', '#984ea3',
+                  '#999999']
+
 
 CCD_size_y = 2750
 CCD_size_x = 2220
@@ -71,7 +82,7 @@ class MainPage(tk.Tk):
 
         # Setting up Initial Things
         self.title("SCORPIO Dither Slit")
-        self.geometry("1100x1100")
+        self.geometry("1700x1100")
         self.resizable(True, True)
         """ to be written """
         
@@ -91,14 +102,14 @@ class MainPage(tk.Tk):
         self.canvas_types = get_canvas_types()
         self.drawcolors = colors.get_colors()
         
-
+        
 # #===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#=====
 #         
 #  #    FITS manager
 #         
 # #===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#=====
         self.frame_FITSmanager = tk.Frame(self,background="pink")#, width=400, height=800)
-        self.frame_FITSmanager.place(x=4, y=4, anchor="nw", width=400, height=250)
+        self.frame_FITSmanager.place(x=4, y=720, anchor="nw", width=400, height=210)
 
         labelframe_FITSmanager =  tk.LabelFrame(self.frame_FITSmanager, text="FITS manager", font=("Arial", 24))
         labelframe_FITSmanager.pack(fill="both", expand="yes")
@@ -116,11 +127,14 @@ class MainPage(tk.Tk):
 # 
 # =============================================================================
         labelframe_Query_Simbad =  tk.LabelFrame(labelframe_FITSmanager, text="Query Simbad", 
-                                                     width=180,height=140,
+                                                     width=180,height=110,
                                                      font=("Arial", 24))
         labelframe_Query_Simbad.place(x=0, y=40)
 
-        button_Query_Simbad =  tk.Button(labelframe_Query_Simbad, text="Query Simbad", bd=3, command=self.Query_Simbad)
+        button_Query_Simbad =  tk.Button(labelframe_Query_Simbad, text="Query Simbad", bd=3, 
+                                         command=self.Query_Simbad)
+        #button_Query_Simbad =  tk.Button(labelframe_Query_Simbad, text="Query Simbad", bd=3, 
+        #                                 command=self.run_queries_in_parallel)
         button_Query_Simbad.place(x=5, y=35)
 
 
@@ -130,17 +144,13 @@ class MainPage(tk.Tk):
         self.label_SelectSurvey.place(x=5, y=5)
 #        # Dropdown menu options
         Survey_options = [
-             "DSS",
              "DSS2/red",
-             "CDS/P/AKARI/FIS/N160",
+             "AKARI/FIS/N160",
              "PanSTARRS/DR1/z",
              "2MASS/J",
              "GALEX",
              "AllWISE/W3",
-             "CDS/P/skymapper-I",
-             "CDS/P/skymapper-G",
-             "CDS/P/skymapper-R",
-             "CDS/P/skymapper-Z"]
+             "skymapper-I"]
 #        # datatype of menu text
         self.Survey_selected = tk.StringVar()
 #        # initial menu text
@@ -148,10 +158,11 @@ class MainPage(tk.Tk):
 #        # Create Dropdown menu
         self.menu_Survey = tk.OptionMenu(labelframe_Query_Simbad, self.Survey_selected ,  *Survey_options)
         self.menu_Survey.place(x=65, y=5)
+        self.menu_Survey.config(foreground="black")
         
         readout_frame = tk.Frame(self, background='pink')
         #readout_frame.pack(side=tk.TOP, fill=tk.X, expand=1)
-        readout_frame.place(x=550, y=820)
+        readout_frame.place(x=600, y=680)
         self.readout_Simbad = tk.Label(readout_frame, text='') 
         self.readout_Simbad.pack()
         #self.readout_Simbad.place(x=0, y=0)
@@ -193,7 +204,7 @@ class MainPage(tk.Tk):
         """ SkyMapper Query """ 
         button_skymapper_query =  tk.Button(labelframe_FITSmanager, text="SkyMapper Query", bd=3, 
                                            command=self.SkyMapper_query)
-        button_skymapper_query.place(x=190,y=80)
+        #button_skymapper_query.place(x=190,y=80)
                
         
         """ Twirl Astrometry """
@@ -219,17 +230,18 @@ class MainPage(tk.Tk):
         
         self.dither_frame = tk.LabelFrame(self,text="Calculate Offset",
                                           font=("Ariel, 25"),width=380, height=210)
-        self.dither_frame.place(x=4, y=300)
+        self.dither_frame.place(x=430, y=720)
         
         label_slit_select =  tk.Label(self.dither_frame, text="Slit Select")
         label_slit_select.place(x=220,y=-5)
         self.selected_slit = tk.StringVar()
         self.slit_widths_dropdown = ttk.Combobox(self.dither_frame, width = 10, 
                                             textvariable=self.selected_slit,
-                                            values=SCORP_SlitWidths)
+                                            values=SCORP_SlitWidths, foreground="black")
         
         self.slit_widths_dropdown.place(x=200, y=15)
         self.slit_widths_dropdown.bind("<<ComboboxSelected>>", self.draw_slit_reg)
+        self.slit_widths_dropdown.config(foreground="black")
         
         self.curr_des_var = tk.StringVar()
         self.curr_des_var.set("current")
@@ -245,47 +257,52 @@ class MainPage(tk.Tk):
         btn_des.place(x=4, y=25)
         self.btn_des = btn_des
         
+        self.use_centroid_var = tk.IntVar()
+        self.use_centroid_for_desired = tk.Checkbutton(self.dither_frame, variable=self.use_centroid_var, onvalue=1, offvalue=0, 
+                                                       text="Place Desired from Centroid")
+        self.use_centroid_for_desired.place(x=4, y=50)
+        
         x_entry_label = tk.Label(self.dither_frame, text="x")
-        x_entry_label.place(x=158, y=50)
+        x_entry_label.place(x=158, y=70)
         y_entry_label = tk.Label(self.dither_frame, text="y")
-        y_entry_label.place(x=208,y=50)
+        y_entry_label.place(x=208,y=70)
         ### current values ######
         
         current_pix_vals_label = tk.Label(self.dither_frame, 
                                           text="Current Pixel Values:")
-        current_pix_vals_label.place(x=4, y=70)
+        current_pix_vals_label.place(x=4, y=90)
         self.x_current = tk.IntVar()
         current_pix_val_x = tk.Entry(self.dither_frame, width=4, 
                                      textvariable=self.x_current)
-        current_pix_val_x.place(x=140, y=70)
+        current_pix_val_x.place(x=140, y=90)
         self.current_pix_val_x = current_pix_val_x
         
         self.y_current = tk.IntVar()
         current_pix_val_y = tk.Entry(self.dither_frame, width=4,
                                      textvariable=self.y_current)
         
-        current_pix_val_y.place(x=190, y=70)
+        current_pix_val_y.place(x=190, y=90)
         self.current_pix_val_y = current_pix_val_y
         
         ### desired values ######
         desired_pix_vals_label = tk.Label(self.dither_frame, 
                                           text="Desired Pixel Values:")
-        desired_pix_vals_label.place(x=4, y=95)
+        desired_pix_vals_label.place(x=4, y=115)
         self.x_desired = tk.IntVar()
         desired_pix_val_x = tk.Entry(self.dither_frame, width=4,
                                      textvariable=self.x_desired)
-        desired_pix_val_x.place(x=140, y=95)
+        desired_pix_val_x.place(x=140, y=115)
         self.desired_pix_val_x = desired_pix_val_x
         
         self.y_desired = tk.IntVar()
         desired_pix_val_y = tk.Entry(self.dither_frame, width=4,
                                      textvariable=self.y_desired)
-        desired_pix_val_y.place(x=190, y=95)
+        desired_pix_val_y.place(x=190, y=115)
         self.desired_pix_val_y = desired_pix_val_y
         
         calc_offset_btn = tk.Button(self.dither_frame, command=self.calc_req_offset,
                                     text="Calculate Required Offset")
-        calc_offset_btn.place(x=90,y=140)
+        calc_offset_btn.place(x=90,y=150)
         
         
         #### display offset result ###
@@ -298,45 +315,47 @@ class MainPage(tk.Tk):
         self.result_east_label_frame = tk.LabelFrame(self.dither_frame,background="pink",
                                                      borderwidth=0,highlightthickness=0, width=60, 
                                                      height=18, foreground="black")
-        self.result_east_label_frame.place(x=250, y=75)
+        self.result_east_label_frame.place(x=250, y=95)
         self.result_east_label_frame.config(text="0",labelanchor="wn")
         east_label = tk.Label(self.dither_frame, text="'' East")
-        east_label.place(x=300,y=75)
+        east_label.place(x=300,y=95)
         
         self.result_north_label_frame = tk.LabelFrame(self.dither_frame,background="pink",
                                                 borderwidth=0,highlightthickness=0, width=60, 
                                                 height=18, foreground="black")
-        self.result_north_label_frame.place(x=250, y=100)
+        self.result_north_label_frame.place(x=250, y=120)
         self.result_north_label_frame.config(text="0",labelanchor="wn")
 
         north_label = tk.Label(self.dither_frame, text="'' North")
-        north_label.place(x=300,y=100)
+        north_label.place(x=300,y=120)
 
       
         
 # #===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#=====
 #
-# GINGA DISPLAY
+# GINGA DISPLAY for SVC
 #
 # #===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#=====
 
         vbox = tk.Frame(self, relief=tk.RAISED, borderwidth=1)
 #        vbox.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
         vbox.pack(side=tk.TOP)
-        vbox.place(x=420, y=10, anchor="nw")#, width=500, height=800)
+        vbox.place(x=570, y=20, anchor="nw")#, width=500, height=800)
         # self.vb = vbox
         
+        label = tk.Label(text="Slit Viewing Camera", font=("Arial", 20))
+        label.place(x=750, y=0)
         #self.bind("<Button 1>", self.getorigin)
 
 
 #        canvas = tk.Canvas(vbox, bg="grey", height=514, width=20)
         self.canvas_yoffset = 420
         self.canvas_xoffset = 10
-        canvas = tk.Canvas(vbox, bg="grey", height=800, width=650)
+        canvas = tk.Canvas(vbox, bg="grey", height=650, width=550)
         canvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
-    
-        
+
+
         fi = CanvasView(logger) #=> ImageViewTk -- a backend for Ginga using a Tk canvas widget
         fi.set_widget(canvas)  #=> Call this method with the Tkinter canvas that will be used for the display.
         # fi.set_redraw_lag(0.0)
@@ -390,7 +409,114 @@ class MainPage(tk.Tk):
 #        fi.configure(516, 528) #height, width
         #fi.set_window_size(514,522)
         #fi.set_window_size(514,20)
+
+# #===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#=====
+#
+# GINGA DISPLAY for IR (2MASS image)
+#
+# #===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#=====
         
+        
+        vbox = tk.Frame(self, relief=tk.RAISED, borderwidth=1)
+        vbox.place(x=4,y=20)
+        self.IR_canvas_yoffset = 420
+        self.IR_canvas_xoffset = 10
+        IR_canvas = tk.Canvas(vbox, bg="grey", height=650, width=550)
+        IR_canvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+        
+        IR_label = tk.Label(text="IR HiPS", font=("Arial", 20))
+        IR_label.place(x=250,y=0)
+        
+        IR_fi = CanvasView(logger)
+        IR_fi.set_widget(IR_canvas)
+        IR_fi.enable_autocuts("on")
+        IR_fi.set_autocut_params("zscale")
+        IR_fi.enable_autozoom("on")
+        IR_fi.set_enter_focus(True)
+        
+        IR_fi.set_callback('cursor-changed', self.IR_cursor_cb)
+        IR_fi.set_bg(0.2, 0.2, 0.2)
+        IR_fi.ui_set_active(True)
+        IR_fi.show_pan_mark(True)
+        
+        IR_fi.show_mode_indicator(True, corner = 'ur')
+        self.IR_fitsimage = IR_fi
+        
+        bd = IR_fi.get_bindings()
+        bd.enable_all(True)
+
+        # canvas that we will draw on
+#        DrawingCanvas = fi.getDrawClasses('drawingcanvas')
+        IR_canvas = self.canvas_types.DrawingCanvas()
+        IR_canvas.enable_draw(True)
+        IR_canvas.enable_edit(True)
+        IR_canvas.set_drawtype('box', color='red')
+        IR_canvas.register_for_cursor_drawing(IR_fi)
+        IR_canvas.add_callback('draw-event', self.IR_draw_cb)
+        IR_canvas.set_draw_mode('draw')
+        
+        IR_canvas.set_surface(IR_fi)
+        IR_canvas.ui_set_active(True)
+        self.IR_canvas = IR_canvas
+        
+        IR_fi.get_canvas().add(IR_canvas)
+        IR_readout_frame = tk.Frame(self, background='pink')
+        #readout_frame.pack(side=tk.TOP, fill=tk.X, expand=1)
+        IR_readout_frame.place(x=50, y=680)
+        self.IR_readout_Simbad = tk.Label(IR_readout_frame, text='') 
+        self.IR_readout_Simbad.pack()
+        
+# #===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#=====
+#
+# GINGA DISPLAY for VIS (DSS/SkyMapper... image)
+# search for image catalog that contains FOV
+#
+# #===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#===#=====
+        
+        
+        vbox = tk.Frame(self, relief=tk.RAISED, borderwidth=1)
+        vbox.place(x=1135,y=20)
+        self.VIS_canvas_yoffset = 420
+        self.VIS_canvas_xoffset = 10
+        VIS_canvas = tk.Canvas(vbox, bg="grey", height=650, width=550)
+        VIS_canvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+        
+        VIS_label = tk.Label(text="VIS HiPS", font=("Arial", 20))
+        VIS_label.place(x=1360,y=0)
+        
+        VIS_fi = CanvasView(logger)
+        VIS_fi.set_widget(VIS_canvas)
+        VIS_fi.enable_autocuts("on")
+        VIS_fi.set_autocut_params("zscale")
+        VIS_fi.enable_autozoom("on")
+        VIS_fi.set_enter_focus(True)
+        
+        VIS_fi.set_callback('cursor-changed', self.cursor_cb)
+        VIS_fi.set_bg(0.2, 0.2, 0.2)
+        VIS_fi.ui_set_active(True)
+        VIS_fi.show_pan_mark(True)
+        
+        VIS_fi.show_mode_indicator(True, corner = 'ur')
+        self.VIS_fitsimage = VIS_fi
+        
+        bd = VIS_fi.get_bindings()
+        bd.enable_all(True)
+
+        # canvas that we will draw on
+#        DrawingCanvas = fi.getDrawClasses('drawingcanvas')
+        VIS_canvas = self.canvas_types.DrawingCanvas()
+        VIS_canvas.enable_draw(True)
+        VIS_canvas.enable_edit(True)
+        VIS_canvas.set_drawtype('box', color='red')
+        VIS_canvas.register_for_cursor_drawing(VIS_fi)
+        VIS_canvas.add_callback('draw-event', self.VIS_draw_cb) #TODO make VIS_draw_cb
+        VIS_canvas.set_draw_mode('draw')
+        
+        VIS_canvas.set_surface(VIS_fi)
+        VIS_canvas.ui_set_active(True)
+        self.VIS_canvas = VIS_canvas
+        
+        VIS_fi.get_canvas().add(VIS_canvas)
         
         """
         HORIZONTAL BOX AT THE BOTTOM WITH ORIGINAL GINGA TOOLS
@@ -430,8 +556,11 @@ class MainPage(tk.Tk):
         self.walpha = walpha
 
         
-        wclear = tk.Button(hbox, text="Clear Canvas",
+        wclear = tk.Button(self, text="Clear Canvases",
                                 command=self.clear_canvas)
+        wclear.place(x=810,y=730)
+        #wclear.pack()
+        
         
         wopen = tk.Button(hbox, text="Open File",
                                command=self.open_file)
@@ -439,10 +568,12 @@ class MainPage(tk.Tk):
         wquit = tk.Button(hbox, text="Quit",
                                command=lambda: self.quit(self))
 
+        
         for w in (wquit, wclear, walpha, tk.Label(hbox, text='Alpha:'),
 #                  wfill, wdrawcolor, wslit, wdrawtype, wopen):
                   wfill, wdrawcolor, wdrawtype):
-            w.pack(side=tk.RIGHT)
+            pass
+            #w.pack(side=tk.RIGHT)
         
     
     def read_dir_user(self):
@@ -467,9 +598,33 @@ class MainPage(tk.Tk):
         # passes the image to the viewer through the set_image() method
         self.fitsimage.set_image(self.AstroImage)
 #        self.root.title(self.fullpath_FITSfilename)
-
+    
+    def test_multi_1(self):
+        for i in range(500):
+            pass
+        print("func1 done")
+        
+    def test_multi_2(self):
+        for i in range(500):
+            pass
+        print("func2 done")
+        
+    def run_queries_in_parallel(self):
+        from multiprocessing import Process
+        
+        fns = [self.test_multi_1, self.test_multi_2]#[self.Query_Simbad, self.IR_Simbad_Query]
+        proc = []
+        for fn in fns:
+          p = Process(target=fn)
+          p.start()
+          proc.append(p)
+        for p in proc:
+          p.join()
+        
     def Query_Simbad(self):
         """ to be written """
+        
+        
         from astroquery.simbad import Simbad                                                            
         from astropy.coordinates import SkyCoord
         from astropy import units as u
@@ -478,7 +633,7 @@ class MainPage(tk.Tk):
 #        coord = SkyCoord('16 14 20.30000000 -19 06 48.1000000', unit=(u.hourangle, u.deg), frame='fk5') 
         query_results = Simbad.query_region(coord)                                                      
         print(query_results)
-    
+        self.check_for_IR_VIS_reference_images(coord.ra.value, coord.dec.value)
     # =============================================================================
     # Download an image centered on the coordinates passed by the main window
     # 
@@ -490,27 +645,8 @@ class MainPage(tk.Tk):
         object_coords = SkyCoord(ra=query_results['RA'], dec=query_results['DEC'], 
                                  unit=(u.hourangle, u.deg), frame='icrs')
         c = SkyCoord(self.string_RA.get(),self.string_DEC.get(), unit=(u.deg, u.deg))
-        """
-        fov = 180#SCORP_Scale*CCD_size_y/60.
-        query_params = { 
-             'hips': self.Survey_selected.get(), #'DSS', #
-             #'object': object_main_id, 
-             # Download an image centered on the first object in the results 
-             #'ra': object_coords[0].ra.value, 
-             #'dec': object_coords[0].dec.value, 
-             #'projection':'TAN',
-             'ra': c.ra.value, 
-             'dec': c.dec.value,
-             'fov': (fov * u.arcsec).to(u.deg).value, 
-             'width': int(CCD_size_x/2), #528, 
-             'height': int(CCD_size_y/2) #516 
-             }                                                                                       
-             #&&&
-        url = f'http://alasky.u-strasbg.fr/hips-image-services/hips2fits?{urlencode(query_params)}' 
-        hdul = fits.open(url)                                                                           
-        # Downloading http://alasky.u-strasbg.fr/hips-image-services/hips2fits?hips=DSS&object=%5BT64%5D++7&ra=243.58457533549102&dec=-19.113364937196987&fov=0.03333333333333333&width=500&height=500
-        #|==============================================================| 504k/504k (100.00%)         0s
-        """
+        self.query_c = c
+
         scale_factor = 2
         #scale = 180/CCD_size_y
         query_params = {"NAXIS1": int(CCD_size_x/scale_factor),
@@ -528,7 +664,8 @@ class MainPage(tk.Tk):
                         "CRVAL2": c.dec.value}
         
         query_wcs = wcs.WCS(query_params)
-        hips = self.Survey_selected.get()
+        hips = "CDS/P/"+self.Survey_selected.get()
+        print(hips)
         hdul = hips2fits.query_with_wcs(hips = hips,
                                         wcs=query_wcs,
                                         get_query_payload=False,
@@ -539,30 +676,9 @@ class MainPage(tk.Tk):
         #No.    Name      Ver    Type      Cards   Dimensions   Format
         #  0  PRIMARY       1 PrimaryHDU      22   (500, 500)   int16   
         print(hdul[0].header)                                                                                  
-        # SIMPLE  =                    T / conforms to FITS standard                      
-        # BITPIX  =                   16 / array data type                                
-        # NAXIS   =                    2 / number of array dimensions                     
-        # NAXIS1  =                  500                                                  
-        # NAXIS2  =                  500                                                  
-        # WCSAXES =                    2 / Number of coordinate axes                      
-        # CRPIX1  =                250.0 / Pixel coordinate of reference point            
-        # CRPIX2  =                250.0 / Pixel coordinate of reference point            
-        # CDELT1  = -6.6666668547014E-05 / [deg] Coordinate increment at reference point  
-        # CDELT2  =  6.6666668547014E-05 / [deg] Coordinate increment at reference point  
-        # CUNIT1  = 'deg'                / Units of coordinate increment and value        
-        # CUNIT2  = 'deg'                / Units of coordinate increment and value        
-        # CTYPE1  = 'RA---TAN'           / Right ascension, gnomonic projection           
-        # CTYPE2  = 'DEC--TAN'           / Declination, gnomonic projection               
-        # CRVAL1  =           243.584534 / [deg] Coordinate value at reference point      
-        # CRVAL2  =         -19.11335065 / [deg] Coordinate value at reference point      
-        # LONPOLE =                180.0 / [deg] Native longitude of celestial pole       
-        # LATPOLE =         -19.11335065 / [deg] Native latitude of celestial pole        
-        # RADESYS = 'ICRS'               / Equatorial coordinate system                   
-        # HISTORY Generated by CDS hips2fits service - See http://alasky.u-strasbg.fr/hips
-        # HISTORY -image-services/hips2fits for details                                   
-        # HISTORY From HiPS CDS/P/DSS2/NIR (DSS2 NIR (XI+IS))    
+          
         self.image = hdul                                    
-        hdul.writeto('./newtable.fits',overwrite=True)
+        #hdul.writeto('./IR_newtable.fits',overwrite=True)
         
         self.wcs = wcs.WCS(hdul[0].header)
         
@@ -599,10 +715,147 @@ class MainPage(tk.Tk):
         fits.writeto(self.fits_image_ff,self.hdu_res.data,header=self.hdu_res.header,overwrite=True) 
  
         # self.root.title(filepath)
+        self.block_light()
+        #self.IR_Simbad_Query()
+        #self.VIS_Simbad_query()
+        
     
+    def check_for_IR_VIS_reference_images(self, RA, DEC):
+        
+        VIS_fpath = "fits_image/VIS_reference_images/"
+        IR_fpath = "fits_image/IR_reference_images/"
+        radec_str = "{}_{}".format(RA,DEC)
+        
+        for f in os.listdir(VIS_fpath):
+            if radec_str in f:
+                fname = VIS_fpath+f
+                break
+            
+        try:
+            VIS_hdul = fits.open(fname)
+            VIS_data = Image.fromarray(VIS_hdul[0].data)
+            img.load_hdu(VIS_hdul[0])
+            self.VIS_fitsimage.set_image(img)
+        except UnboundLocalError:
+            self.VIS_Simbad_query()
+        
+        ##########
+        
+        for f in os.listdir(IR_fpath):
+            if radec_str in f:
+                fname = IR_fpath+f
+                break
+            
+        try:
+            IR_hdul = fits.open(fname)
+            IR_data = Image.fromarray(IR_hdul[0].data)
+            img.load_hdu(IR_hdul[0])
+            self.IR_fitsimage.set_image(img)
+        except UnboundLocalError:
+            self.IR_Simbad_Query()
 
+    def IR_Simbad_Query(self):
+        
 
+        
+        scale_factor = 2
+        query_params = {"NAXIS1": int(CCD_size_x/scale_factor),
+                        "NAXIS2": int(CCD_size_y/scale_factor),
+                        "WCSAXES": 2,
+                        "CRPIX1": int(CCD_size_x/(scale_factor*2)),
+                        "CRPIX2": int(CCD_size_y/(scale_factor*2)),
+                        "CDELT1": SCORP_Scale/3600 * scale_factor  ,
+                        "CDELT2": SCORP_Scale/3600 * scale_factor,
+                        "CUNIT1": "deg",
+                        "CUNIT2": "deg",
+                        "CTYPE1": "RA---TAN",
+                        "CTYPE2": "DEC--TAN",
+                        "CRVAL1": self.query_c.ra.value,
+                        "CRVAL2": self.query_c.dec.value}
+                                                   
+        IR_query_wcs = wcs.WCS(query_params)
+        hips = "2MASS/J" #self.Survey_selected.get()
+        
+        hdul = hips2fits.query_with_wcs(hips = hips, 
+                                        wcs=IR_query_wcs,
+                                        get_query_payload=False,
+                                        format='fits', min_cut=0.5, max_cut=99.5)
+        img = AstroImage()
+        Posx = self.string_RA.get()
+        Posy = self.string_DEC.get()
+        filt= self.string_Filter.get()
+        data = hdul[0].data#[:,::-1]
+        # PIL Image indexing is like FITS (x, y)
+        image_data = Image.fromarray(data)
+        img_res = image_data
+        img_res = image_data.resize(size=(CCD_size_x,CCD_size_y))
+        self.IR_hdu_res = fits.PrimaryHDU(data=img_res, header=hdul[0].header)
+            # ra, dec in degrees
+        ra = Posx
+        dec = Posy
+        self.IR_hdu_res.header['RA'] = ra
+        self.IR_hdu_res.header['DEC'] = dec
+        self.IR_wcs = hdul[0].header
 
+#            rebinned_filename = "./SkyMapper_g_20140408104645-29_150.171-54.790_1056x1032.fits"
+ #           hdu.writeto(rebinned_filename,overwrite=True)
+
+        img.load_hdu(self.hdu_res)       
+        print('\n',self.hdu_res.header)     
+        self.IR_fitsimage.set_image(img)
+        self.IR_AstroImage = img
+
+    def VIS_Simbad_query(self):
+        
+        scale_factor = 2
+        query_params = {"NAXIS1": int(CCD_size_x/scale_factor),
+                        "NAXIS2": int(CCD_size_y/scale_factor),
+                        "WCSAXES": 2,
+                        "CRPIX1": int(CCD_size_x/(scale_factor*2)),
+                        "CRPIX2": int(CCD_size_y/(scale_factor*2)),
+                        "CDELT1": SCORP_Scale/3600 * scale_factor  ,
+                        "CDELT2": SCORP_Scale/3600 * scale_factor,
+                        "CUNIT1": "deg",
+                        "CUNIT2": "deg",
+                        "CTYPE1": "RA---TAN",
+                        "CTYPE2": "DEC--TAN",
+                        "CRVAL1": self.query_c.ra.value,
+                        "CRVAL2": self.query_c.dec.value}
+                                                   
+        VIS_query_wcs = wcs.WCS(query_params)
+        hips_list = "CDS/P/DSS2/red" #, "CDS/P/skymapper-I"] #self.Survey_selected.get()
+        
+        hdul = hips2fits.query_with_wcs(hips = hips_list, 
+                                        wcs=VIS_query_wcs,
+                                        get_query_payload=False,
+                                        format='fits', min_cut=0.5, max_cut=99.5)
+        img = AstroImage()
+        Posx = self.string_RA.get()
+        Posy = self.string_DEC.get()
+        filt= self.string_Filter.get()
+        data = hdul[0].data#[:,::-1]
+        # PIL Image indexing is like FITS (x, y)
+        image_data = Image.fromarray(data)
+        img_res = image_data
+        img_res = image_data.resize(size=(CCD_size_x,CCD_size_y))
+        self.IR_hdu_res = fits.PrimaryHDU(data=img_res, header=hdul[0].header)
+            # ra, dec in degrees
+        ra = Posx
+        dec = Posy
+        self.VIS_hdu_res.header['RA'] = ra
+        self.VIS_hdu_res.header['DEC'] = dec
+        self.VIS_wcs = hdul[0].header
+
+#            rebinned_filename = "./SkyMapper_g_20140408104645-29_150.171-54.790_1056x1032.fits"
+ #           hdu.writeto(rebinned_filename,overwrite=True)
+
+        img.load_hdu(self.hdu_res)       
+        print('\n',self.hdu_res.header)     
+        self.VIS_fitsimage.set_image(img)
+        self.VIS_AstroImage = img
+        
+        
+        
     """ 
     Inject image from SkyMapper to create a WCS solution using twirl
     """
@@ -643,104 +896,7 @@ class MainPage(tk.Tk):
  
         self.block_light()
         
-        # self.root.title(filepath)
-    
-    """
-    def twirl_Astrometry(self):
-        """"""# to be written """""""
-        from astropy.io import fits
-        import numpy as np
-        from astropy import units as u
-        from astropy.coordinates import SkyCoord
-        from matplotlib import pyplot as plt
-        import twirl
-        
-        self.Display(self.fits_image_ff)
-        # self.load_file()   #for ging
-        print(self.fits_image_ff)
-        hdu=fits.open(self.fits_image_ff)[0]  #for this function to work
-        
-        header = hdu.header 
-        data = hdu.data
-        
-        ra, dec = header["RA"], header["DEC"]
-        center = SkyCoord(ra, dec, unit=["deg", "deg"])
-        center = [center.ra.value, center.dec.value]
-        
-        # image shape and pixel size in "
-        shape = data.shape
-        pixel = SCORP_Scale * u.arcsec
-        fov = 180/3600#np.max(shape)*pixel.to(u.deg).value
-        
-        # Let's find some stars and display the image
-        
-        self.canvas.delete_all_objects(redraw=True)
-        
-        stars = twirl.find_peaks(data)[0:self.nrofstars.get()]
-        
-#        plt.figure(figsize=(8,8))
-        med = np.median(data)
-#        plt.imshow(data, cmap="Greys_r", vmax=np.std(data)*5 + med, vmin=med)
-#        plt.plot(*stars.T, "o", fillstyle="none", c="w", ms=12)
 
-        from regions import PixCoord, CirclePixelRegion
-#        xs=stars[0,0]
-#        ys=stars[0,1]
-#        center_pix = PixCoord(x=xs, y=ys)
-        radius_pix = 42
-#        region = CirclePixelRegion(center_pix, radius_pix)
-        
-        regions = [CirclePixelRegion(center=PixCoord(x, y), radius=radius_pix)
-                for x, y in stars]  #[(1, 2), (3, 4)]]
-        regs = Regions(regions)
-        for reg in regs:
-            obj = r2g(reg)
-            obj.color = "red"
-        # add_region(self.canvas, obj, tag="twirlstars", draw=True)
-            self.canvas.add(obj)
-        
-        # we can now compute the WCS
-        gaias = twirl.gaia_radecs(center, fov, limit=self.nrofstars.get())
-        self.wcs = twirl._compute_wcs(stars, gaias)
-        self.wcs = twirl.compute_wcs(center=center, stars=stars, fov=fov)
-        
-        
-        # Lets check the WCS solution 
-        
-#        plt.figure(figsize=(8,8))
-        radius_pix = 25
-        gaia_pixel = np.array(SkyCoord(gaias, unit="deg").to_pixel(self.wcs)).T
-        regions_gaia = [CirclePixelRegion(center=PixCoord(x, y), radius=radius_pix)
-                for x, y in gaia_pixel]  #[(1, 2), (3, 4)]]
-        regs_gaia = Regions(regions_gaia)
-        for reg in regs_gaia:
-            obj = r2g(reg)
-            obj.color="green"
-        # add_region(self.canvas, obj, tag="twirlstars", redraw=True)
-            self.canvas.add(obj)
-        
-        print(self.wcs)
-        hdu_wcs = self.wcs.to_fits()
-        hdu_wcs[0].data = data # add data to fits file
-        self.wcs_filename = "./fits_image/" + "WCS_"+ra+"_"+dec+".fits"
-        hdu_wcs[0].writeto(self.wcs_filename,overwrite=True)
-        
-        self.Display(self.wcs_filename)
-        
-        self.block_light()
-        
-        self.btn_curr.config(state = tk.ACTIVE)
-        self.btn_des.config(state = tk.ACTIVE)
-        
-        
-        #
-        # > to read:
-        # hdu = fits_open(self.wcs_filename)
-        # hdr = hdu[0].header
-        # import astropy.wcs as apwcs
-        # wcs = apwcs.WCS(hdu[('sci',1)].header)
-        # hdu.close()
-    """
     def twirl_Astrometry(self):
         
         from astropy.io import fits
@@ -836,6 +992,7 @@ class MainPage(tk.Tk):
         
         self.btn_curr.config(state = tk.ACTIVE)
         self.btn_des.config(state = tk.ACTIVE)
+        self.block_light()
         #
         # > to read:
         # hdu = fits_open(self.wcs_filename)
@@ -895,9 +1052,9 @@ class MainPage(tk.Tk):
         blocked_light_left_obj = r2g(blocked_light_left_reg)
         
         blocked_light_left_obj.fill = True
-        blocked_light_left_obj.fillalpha = 0.5
-        blocked_light_left_obj.color = "pink"
-        blocked_light_left_obj.fillcolor = "pink"
+        blocked_light_left_obj.fillalpha = 1
+        blocked_light_left_obj.color = "black"
+        blocked_light_left_obj.fillcolor = "black"
         self.canvas.add(blocked_light_left_obj)
         
         blocked_light_right_width = (CCD_size_x-blocked_light_right)
@@ -910,53 +1067,19 @@ class MainPage(tk.Tk):
         
         blocked_light_right_obj = r2g(blocked_light_right_reg)
         blocked_light_right_obj.fill = True
-        blocked_light_right_obj.fillalpha = 0.5
-        blocked_light_right_obj.color = "pink"
-        blocked_light_right_obj.fillcolor = "pink"
+        blocked_light_right_obj.fillalpha = 1
+        blocked_light_right_obj.color = "black"
+        blocked_light_right_obj.fillcolor = "black"
         self.canvas.add(blocked_light_right_obj)
         
-        
-        y_center_pix = CCD_size_y/2
-        scale_fov_y = SCORP_Scale #180/2750
-        light_up_down_pix = 45/scale_fov_y # half of 90'' height of allowed light
-        
-        if y_center_pix>light_up_down_pix:
-            
-            blocked_light_updown_height = y_center_pix-light_up_down_pix 
-            
-            
-            blocked_light_down_reg = RectanglePixelRegion(
-                center=PixCoord(CCD_size_x/2,blocked_light_updown_height/2), 
-                                             width=CCD_size_x, height=blocked_light_updown_height)
-            
-            blocked_light_down_obj = r2g(blocked_light_down_reg)
-            
-            blocked_light_down_obj.fill = True
-            blocked_light_down_obj.fillalpha = 0.5
-            blocked_light_down_obj.color = "pink"
-            blocked_light_down_obj.fillcolor = "pink"
-            #self.canvas.add(blocked_light_down_obj)
-            
-            
-            
-            up_center_y = CCD_size_y - (blocked_light_updown_height/2)
-            #print(up_center_y)
-            
-            blocked_light_up_reg = RectanglePixelRegion(
-                center=PixCoord(CCD_size_x/2, up_center_y), 
-                width=CCD_size_x, height=blocked_light_updown_height)
-            
-            blocked_light_up_obj = r2g(blocked_light_up_reg)
-            blocked_light_up_obj.fill = True
-            blocked_light_up_obj.fillalpha = 0.5
-            blocked_light_up_obj.color = "pink"
-            blocked_light_up_obj.fillcolor = "pink"
-            #self.canvas.add(blocked_light_up_obj)
+
             
         
     def draw_slit_reg(self, event):
         
         SlitWidth = self.slit_widths_dropdown.get()
+        slit_num = self.slit_widths_dropdown.current()
+        slit_color = SCORP_SlitColors[slit_num]
         width = float(SlitWidth)/SCORP_Scale
         height = 90/SCORP_Scale # arcsec full height of image
         
@@ -969,6 +1092,9 @@ class MainPage(tk.Tk):
         fake_slit_reg = RectanglePixelRegion(center=PixCoord(CCD_size_x/2,CCD_size_y/2), 
                                          width=width, height=height)
         obj = r2g(fake_slit_reg)
+        obj.fill = True
+        obj.fillcolor = slit_color
+        obj.color = slit_color
         self.canvas.add(obj)
         
         self.current_slit_draw_obj = obj
@@ -1013,8 +1139,8 @@ class MainPage(tk.Tk):
         hdu = fits.open(filename)
         hdr = hdu[0].header
         
-        ra = hdr["RA"]
-        dec = hdr["DEC"]
+        ra = hdr["CRVAL1"]
+        dec = hdr["CRVAL2"]
         self.string_DEC.set(dec)
         self.string_RA.set(ra)
         
@@ -1027,6 +1153,38 @@ class MainPage(tk.Tk):
             print("should be activated")
             
         self.block_light()
+        
+    def IR_draw_cb(self, canvas, tag):
+        obj = canvas.get_object_by_tag(tag)
+        print("drawing on IR canvas.")
+        obj.add_callback('edited', self.edit_cb)
+        # obj.add_callback('pick-key',self.delete_obj_cb, 'key')
+        x_c, y_c = obj.get_center_pt()
+        
+        #p = PointPixelRegion(center=PixCoord(x_c, y_c), 
+        #                     visual=RegionVisual(point='+', 
+        #                                         fontsize=10, color='red'))
+        p = CirclePixelRegion(center=PixCoord(x_c, y_c), radius=50)
+        canvas.add(r2g(p))
+        #self.IR_canvas.add(r2g(p))
+        self.VIS_canvas.add(r2g(p))
+        self.canvas.add(r2g(p))
+        canvas.delete_object(obj)
+            
+    def VIS_draw_cb(self, canvas, tag):
+        obj = canvas.get_object_by_tag(tag)
+        
+        obj.add_callback('edited', self.edit_cb)
+        # obj.add_callback('pick-key',self.delete_obj_cb, 'key')
+        x_c, y_c = obj.get_center_pt()
+        #p = PointPixelRegion(center=PixCoord(x_c, y_c), 
+        #                     visual=RegionVisual(point='+', 
+        #                                         fontsize=10, color='red'))
+        p = CirclePixelRegion(center=PixCoord(x_c, y_c), radius=50)
+        
+        canvas.add(r2g(p))
+        self.canvas.add(r2g(p))
+        self.IR_canvas.add(r2g(p))
             
     def draw_cb(self, canvas, tag):
         """ to be written """
@@ -1052,54 +1210,78 @@ class MainPage(tk.Tk):
             
         elif type_draw=="desired":
             
-            img_data = self.AstroImage.get_data()
-            
-            r = RectanglePixelRegion(center=PixCoord(x=x_c, y=y_c),
-                                            width=110, height=110,
-                                            angle = 0*u.deg)
-            
-            robj = r2g(r)
-            print(x_c, y_c)
-            self.canvas.add(robj)
-            data_box = self.AstroImage.cutout_shape(robj)
-            # we can now remove the "pointer" object
-            #CM.CompoundMixin.delete_object(self.canvas,robj)
-            peaks = iq.find_bright_peaks(data_box)
-            print(peaks[:20])  # subarea coordinates
-            x1=robj.x-robj.xradius
-            y1=robj.y-robj.yradius
-            px,py=round(peaks[0][0]+x1),round(peaks[0][1]+y1)
-            print('peak found at: ', px,py)   #image coordinates
-            print('with counts: ',img_data[py,px]) #actual counts
-            # evaluate peaks to get FWHM, center of each peak, etc.
-            objs = iq.evaluate_peaks(peaks, data_box) 
-            print('full evaluation: ',objs)
-            print('fitted centroid: ', objs[0].objx,objs[0].objy) 
-            print('FWHM: ', objs[0].fwhm) 
-            print('peak value: ',objs[0].brightness)
-            print('sky level: ',objs[0].skylevel)
-            print('median of area: ',objs[0].background)
-            x1, y1, x2, y2 = robj.get_llur()
-            print("the four vertex of the rectangle are, in pixel coord (x1, y1, x2, y2): {} {} {} {}".format(x1, y1, x2, y2))
-            print("cx + x1, cy + y1", objs[0].objx+x1, objs[0].objy+y1)
-            centroid_x, centroid_y = objs[0].objx+x1, objs[0].objy+y1
-            print("the RADEC of the fitted centroid are, in decimal degrees:")
-            print(self.AstroImage.pixtoradec(objs[0].objx,objs[0].objy))
-            print(self.AstroImage.pixtoradec(centroid_x, centroid_y))
-            #CM.CompoundMixin.delete_object(self.canvas,robj)
-            robj.x = centroid_x
-            robj.y = centroid_y
-            robj.yradius = 100
-            robj.xradius = 10
-            
-            p = PointPixelRegion(center=PixCoord(centroid_x, centroid_y), 
-                                 visual=RegionVisual(point='+', 
-                                                     fontsize=10, color='red'))
-            
+            if self.use_centroid_var.get()==1:
+                img_data = self.AstroImage.get_data()
+                
+                r = RectanglePixelRegion(center=PixCoord(x=x_c, y=y_c),
+                                                width=300, height=300,
+                                                angle = 0*u.deg)
+                r = g2r(obj)
+                
+                robj = r2g(r)
+                print(x_c, y_c)
+                self.canvas.add(robj)
+                data_box = self.AstroImage.cutout_shape(robj)
+                # we can now remove the "pointer" object
+                #CM.CompoundMixin.delete_object(self.canvas,robj)
+                peaks = iq.find_bright_peaks(data_box)
+                print(peaks[:20])  # subarea coordinates
+                x1=robj.x-robj.xradius
+                y1=robj.y-robj.yradius
+                px,py=round(peaks[0][0]+x1),round(peaks[0][1]+y1)
+                print('peak found at: ', px,py)   #image coordinates
+                print('with counts: ',img_data[py,px]) #actual counts
+                # evaluate peaks to get FWHM, center of each peak, etc.
+                objs = iq.evaluate_peaks(peaks, data_box) 
+                print('full evaluation: ',objs)
+                print('fitted centroid: ', objs[0].objx,objs[0].objy) 
+                print('FWHM: ', objs[0].fwhm) 
+                print('peak value: ',objs[0].brightness)
+                print('sky level: ',objs[0].skylevel)
+                print('median of area: ',objs[0].background)
+                x1, y1, x2, y2 = robj.get_llur()
+                print("the four vertex of the rectangle are, in pixel coord (x1, y1, x2, y2): {} {} {} {}".format(x1, y1, x2, y2))
+                print("cx + x1, cy + y1", objs[0].objx+x1, objs[0].objy+y1)
+                centroid_x, centroid_y = objs[0].objx+x1, objs[0].objy+y1
+                print("the RADEC of the fitted centroid are, in decimal degrees:")
+                print(self.AstroImage.pixtoradec(objs[0].objx,objs[0].objy))
+                print(self.AstroImage.pixtoradec(centroid_x, centroid_y))
+                #CM.CompoundMixin.delete_object(self.canvas,robj)
+                robj.x = centroid_x
+                robj.y = centroid_y
+                robj.yradius = 100
+                robj.xradius = 10
+                
+                p = PointPixelRegion(center=PixCoord(centroid_x, centroid_y), 
+                                     visual=RegionVisual(point='+', 
+                                                         fontsize=10, color='red'))
+                
+                
+                
+                self.x_desired.set(centroid_x)
+                self.y_desired.set(centroid_y)
+            else:
+                
+                r = RectanglePixelRegion(center=PixCoord(x=x_c, y=y_c),
+                                                width=10, height=100,
+                                                angle = 0*u.deg)
+                
+                robj = r2g(r)
+                robj.yradius = 100
+                robj.xradius = 10
+                p = PointPixelRegion(center=PixCoord(x_c, y_c), 
+                                     visual=RegionVisual(point='+', 
+                                                         fontsize=10, color='red'))
+                
+                
+                
+                self.x_desired.set(x_c)
+                self.y_desired.set(y_c)
+                
             canvas.add(r2g(p))
-            
-            self.x_desired.set(centroid_x)
-            self.y_desired.set(centroid_y)
+            canvas.add(robj)
+            self.IR_canvas.add(r2g(p))
+            self.VIS_canvas.add(r2g(p))
             
         CM.CompoundMixin.delete_object(self.canvas,obj)
         
@@ -1125,6 +1307,8 @@ class MainPage(tk.Tk):
             pass
         
         self.canvas.set_draw_mode(mode)
+        self.IR_canvas.set_draw_mode(mode)
+        self.VIS_canvas.set_draw_mode(mode)
         
     def set_drawparams(self, evt):
          """ to be written """
@@ -1143,7 +1327,44 @@ class MainPage(tk.Tk):
              params['fillalpha'] = alpha
 
          self.canvas.set_drawtype(kind, **params)
+         self.IR_canvas.set_drawtype(kind, **params)
+         self.VIS_canvas.set_drawtype(kind, **params)
+    
+    def IR_cursor_cb(self, viewer, button, data_x, data_y):
+        try:
+            # We report the value across the pixel, even though the coords
+            # change halfway across the pixel
+            value = viewer.get_data(int(data_x + viewer.data_off),
+                                    int(data_y + viewer.data_off))
             
+            value = np.round(value, 2)
+
+        except Exception:
+            value = None
+
+        fits_x, fits_y = data_x + 1, data_y + 1
+
+        # Calculate WCS RA
+        try:
+            # NOTE: image function operates on DATA space coords
+            image = viewer.get_image()
+            if image is None:
+                # No image loaded
+                return
+            ra_txt, dec_txt = image.pixtoradec(fits_x, fits_y,
+                                               format='str', coords='fits')
+        except Exception as e:
+            self.logger.warning("Bad coordinate conversion: %s" % (
+                str(e)))
+            ra_txt = 'BAD WCS'
+            dec_txt = 'BAD WCS'
+
+        text = "RA: %s  DEC: %s  X: %.2f  Y: %.2f  Value: %s" % (
+            ra_txt, dec_txt, fits_x, fits_y, value)
+#        text = "RA: %s  DEC: %s  X: %.2f  Y: %.2f  Value: %s Button %s" % (
+#            ra_txt, dec_txt, fits_x, fits_y, value, button) 
+        self.IR_readout_Simbad.config(text=text)
+    
     def cursor_cb(self, viewer, button, data_x, data_y):
         """This gets called when the data position relative to the cursor
         changes.
@@ -1201,7 +1422,10 @@ class MainPage(tk.Tk):
         
                     
         self.canvas.delete_all_objects(redraw=True)
+        self.IR_canvas.delete_all_objects(redraw=True)
+        self.VIS_canvas.delete_all_objects(redraw=True)
         self.block_light()
+        
         
     def quit(self,root):
         root.destroy()
